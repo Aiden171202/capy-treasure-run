@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Capy Treasure Run</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <canvas id="game"></canvas>
+
+  <div id="ui">
+    <div id="startScreen">
+      <h1>🦫 Capy Treasure Run</h1>
+      <p>Serving the Gradient Network</p>
+      <button id="startBtn">Start Run</button>
+    </div>
+
+    <div id="gameOver" class="hidden">
+      <h2>Run Ended</h2>
+      <p id="finalScore"></p>
+      <button id="restartBtn">Restart</button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
