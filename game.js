@@ -1,55 +1,72 @@
 /* =====================
-   Canvas Setup
+   CANVAS SETUP (CRITICAL FIX)
 ===================== */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-function resize() {
+function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 }
-window.addEventListener("resize", resize);
-resize();
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
 
 /* =====================
-   Game State
+   UI ELEMENTS
+===================== */
+const startScreen = document.getElementById("startScreen");
+const gameOverScreen = document.getElementById("gameOver");
+const finalScoreText = document.getElementById("finalScore");
+
+document.getElementById("startBtn").onclick = startGame;
+document.getElementById("restartBtn").onclick = startGame;
+
+/* =====================
+   GAME STATE
 ===================== */
 let running = false;
 let speed = 6;
 let score = 0;
-let lanes = [-1, 0, 1];
+let animationId;
 
-const groundY = canvas.height * 0.75;
+const lanes = [-1, 0, 1];
+const laneWidth = 120;
 
 /* =====================
-   Capy Character
+   CAPY CHARACTER
 ===================== */
 const capy = {
   lane: 0,
-  y: groundY,
+  y: 0,
   vy: 0,
+  radius: 26,
   jumping: false,
-  sliding: false,
-  radius: 28,
-  hit() {
-    endGame();
+
+  reset() {
+    this.lane = 0;
+    this.y = canvas.height * 0.75;
+    this.vy = 0;
+    this.jumping = false;
   },
+
   update() {
     this.y += this.vy;
     this.vy += 0.9;
 
-    if (this.y >= groundY) {
-      this.y = groundY;
+    const ground = canvas.height * 0.75;
+    if (this.y >= ground) {
+      this.y = ground;
       this.vy = 0;
       this.jumping = false;
     }
   },
+
   draw() {
-    const x = canvas.width / 2 + this.lane * 120;
+    const x = canvas.width / 2 + this.lane * laneWidth;
 
     // Glow
     ctx.shadowColor = "#7b5cff";
-    ctx.shadowBlur = 20;
+    ctx.shadowBlur = 18;
 
     // Body
     ctx.fillStyle = "#9c6b3d";
@@ -74,28 +91,46 @@ const capy = {
 };
 
 /* =====================
-   Obstacles (Nodes)
+   OBSTACLES (NODES)
 ===================== */
 const obstacles = [];
 
 function spawnObstacle() {
   const type = Math.floor(Math.random() * 4);
   obstacles.push({
-    type,
-    lane: lanes[Math.floor(Math.random() * 3)],
-    y: -60,
-    active: true
+    lane: lanes[Math.floor(Math.random() * lanes.length)],
+    y: -50,
+    r: 22,
+    type
   });
 }
 
-setInterval(() => {
-  if (running) spawnObstacle();
-}, 1200);
+let spawnTimer = 0;
 
 /* =====================
-   Update Loop
+   INPUT
 ===================== */
-function update() {
+window.addEventListener("keydown", e => {
+  if (!running) return;
+
+  if ((e.key === " " || e.key === "ArrowUp") && !capy.jumping) {
+    capy.vy = -16;
+    capy.jumping = true;
+  }
+
+  if (e.key === "ArrowLeft") {
+    capy.lane = Math.max(-1, capy.lane - 1);
+  }
+
+  if (e.key === "ArrowRight") {
+    capy.lane = Math.min(1, capy.lane + 1);
+  }
+});
+
+/* =====================
+   MAIN LOOP
+===================== */
+function gameLoop() {
   if (!running) return;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -104,33 +139,41 @@ function update() {
   capy.update();
   capy.draw();
 
+  spawnTimer++;
+  if (spawnTimer > 70) {
+    spawnObstacle();
+    spawnTimer = 0;
+  }
+
   obstacles.forEach(o => {
     o.y += speed;
-
     drawNode(o);
 
-    // Collision
-    if (
-      Math.abs(o.lane - capy.lane) < 0.1 &&
-      Math.abs(o.y - capy.y) < 40
-    ) {
-      capy.hit();
+    const ox = canvas.width / 2 + o.lane * laneWidth;
+    const dx = ox - (canvas.width / 2 + capy.lane * laneWidth);
+    const dy = o.y - capy.y;
+
+    if (Math.abs(dx) < 40 && Math.abs(dy) < 40) {
+      endGame();
     }
   });
 
-  score += 0.1;
-  speed += 0.0005;
+  score += 0.15;
+  speed += 0.0007;
 
   drawHUD();
-  requestAnimationFrame(update);
+
+  animationId = requestAnimationFrame(gameLoop);
 }
 
 /* =====================
-   Drawing Helpers
+   DRAWING
 ===================== */
 function drawBackground() {
-  // Network grid
-  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.fillStyle = "#0b0b14";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.04)";
   for (let i = 0; i < canvas.width; i += 80) {
     ctx.beginPath();
     ctx.moveTo(i, 0);
@@ -140,11 +183,12 @@ function drawBackground() {
 }
 
 function drawNode(o) {
-  const x = canvas.width / 2 + o.lane * 120;
+  const x = canvas.width / 2 + o.lane * laneWidth;
+  const colors = ["#ff5c5c", "#5ce1ff", "#f4ff5c", "#7bff7b"];
 
-  ctx.fillStyle = ["#ff5c5c", "#5ce1ff", "#f4ff5c", "#7bff7b"][o.type];
+  ctx.fillStyle = colors[o.type];
   ctx.beginPath();
-  ctx.arc(x, o.y, 24, 0, Math.PI * 2);
+  ctx.arc(x, o.y, o.r, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -155,38 +199,31 @@ function drawHUD() {
 }
 
 /* =====================
-   Controls
-===================== */
-window.addEventListener("keydown", e => {
-  if (!running) return;
-  if ((e.key === " " || e.key === "ArrowUp") && !capy.jumping) {
-    capy.vy = -16;
-    capy.jumping = true;
-  }
-  if (e.key === "ArrowLeft") capy.lane = Math.max(-1, capy.lane - 1);
-  if (e.key === "ArrowRight") capy.lane = Math.min(1, capy.lane + 1);
-});
-
-/* =====================
-   Game Flow
+   GAME FLOW
 ===================== */
 function startGame() {
-  document.getElementById("startScreen").classList.add("hidden");
-  document.getElementById("gameOver").classList.add("hidden");
+  cancelAnimationFrame(animationId);
+
+  startScreen.classList.add("hidden");
+  gameOverScreen.classList.add("hidden");
 
   obstacles.length = 0;
+  spawnTimer = 0;
   speed = 6;
   score = 0;
-  capy.lane = 0;
-  capy.y = groundY;
+
+  capy.reset();
   running = true;
 
-  update();
+  gameLoop();
 }
 
 function endGame() {
   running = false;
-  document.getElementById("gameOver").classList.remove("hidden");
-  document.getElementById("finalScore").innerText =
+  cancelAnimationFrame(animationId);
+
+  finalScoreText.textContent =
     `Requests Served: ${Math.floor(score)}`;
+
+  gameOverScreen.classList.remove("hidden");
 }
